@@ -34,14 +34,24 @@ class Board
 		true
 	end
 
+	def move_valid?(from_pos, to_pos)
+		unless (from_pos + to_pos).flatten.all? { |x| x.between?(0, 7) }
+			return false
+		end
+
+		piece = @board[from_pos[0]][from_pos[1]]
+
+		return false unless @board[to_pos[0]][to_pos[1]].nil?
+		true
+	end
+
 	def perform_slide(from_pos, to_pos)
 
-		i, j = from_pos[0], from_pos[1]
-		x, y = to_pos[0], to_pos[1]
+		i, j, x, y = from_pos[0], from_pos[1], to_pos[0], to_pos[1]
 
 		piece = @board[i][j]
 
-		raise InvalidMoveError unless @board[x][y].nil?
+		raise InvalidMoveError unless move_valid?(from_pos, to_pos)
 		raise InvalidMoveError unless piece.slide_moves.include? [(x-i), (y-j)]
 
 		@board[x][y] = piece
@@ -51,8 +61,29 @@ class Board
 	end
 
 	def perform_jump(from_pos, to_pos)
+
+		# from and to square coordinates
+		i, j, x, y = from_pos[0], from_pos[1], to_pos[0], to_pos[1]
+		# jumped square coordinates
+		m, n = x - (x - i)/2, y - (y - j)/2
 		
-		
+		jumped_piece = @board[m][n]
+
+		piece = @board[i][j]
+
+		raise InvalidMoveError unless move_valid?(from_pos, to_pos)
+		raise InvalidMoveError unless piece.jump_moves.include? [(x-i), (y-j)]
+		raise InvalidMoveError if jumped_piece.nil?
+		if jumped_piece.color == piece.color
+			raise InvalidMoveError
+		end
+
+		@pieces.delete(jumped_piece)
+		@board[m][n] = nil
+		@board[i][j] = nil
+		@board[x][y] = piece
+		true
+
 	end
 
 	def add_piece(piece, pos)
