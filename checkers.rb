@@ -183,5 +183,26 @@ class KingPiece < Piece
 
 end
 
+class HumanPlayer
+	def get_move
+		move_array = []
+		move_array << get_piece
+		move_array.concat get_sequence
+	end
 
+	def get_piece
+		puts "Pick a piece to move."
+		gets.chomp.split("").map(&:to_i)
+	end
+
+	def get_sequence
+		move_sequence = []
+		puts "Enter a location or series of locations to move the piece."
+		seq = gets.chomp.split("").map(&:to_i)
+		until seq.empty?
+			move_sequence << seq.shift(2)
+		end
+		move_sequence
+	end
+end
 
