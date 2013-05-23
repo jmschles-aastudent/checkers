@@ -1,3 +1,8 @@
+class Game
+
+
+end
+
 class Board
 
 	attr_accessor :pieces, :board
@@ -52,6 +57,7 @@ class Board
 		true
 	end
 
+
 end
 
 class InvalidMoveError < StandardError
@@ -65,8 +71,8 @@ class Piece
 	def initialize(color, board, pos)
 		@pos = pos
 		@color = color
-		@board_controller = board
-		@board = board.rows
+		@board = board
+		@rows = board.rows
 		board.add_piece(self, pos)
 	end
 
@@ -85,32 +91,32 @@ class Piece
 			return false
 		end
 
-		return false unless @board[to_pos[0]][to_pos[1]].nil?
+		return false unless @rows[to_pos[0]][to_pos[1]].nil?
 		true
 	end
 
-	def perform_slide(to_pos)
+	def perform_slide(board, to_pos)
 
 		i, j, x, y = self.pos[0], self.pos[1], to_pos[0], to_pos[1]
 
 		raise InvalidMoveError unless move_valid?(to_pos)
 		raise InvalidMoveError unless self.slide_moves.include? [(x-i), (y-j)]
 
-		@pos = [x, y]
-		@board[x][y] = self
-		@board[i][j] = nil
+		board.pieces.select { |piece| piece.pos == self.pos }.last.pos = [x, y]
+		board.rows[x][y] = self
+		board.rows[i][j] = nil
 
 		true
 	end
 
-	def perform_jump(to_pos)
+	def perform_jump(board, to_pos)
 
 		# from and to square coordinates
 		i, j, x, y = self.pos[0], self.pos[1], to_pos[0], to_pos[1]
 		# jumped square coordinates
 		m, n = x - (x - i)/2, y - (y - j)/2
 		
-		jumped_piece = @board[m][n]
+		jumped_piece = board.rows[m][n]
 
 		raise InvalidMoveError unless move_valid?(to_pos)
 		raise InvalidMoveError unless self.jump_moves.include? [(x-i), (y-j)]
@@ -119,27 +125,26 @@ class Piece
 			raise InvalidMoveError
 		end
 
-		@board_controller.pieces.delete(jumped_piece)
-		@board[m][n] = nil
-		@board[i][j] = nil
-		@pos = [x, y]
-		@board[x][y] = self
+		board.pieces.delete(jumped_piece)
+		board.rows[m][n] = nil
+		board.rows[i][j] = nil
+		board.pieces.select { |piece| piece.pos == self.pos }.last.pos = [x, y]
+		board.rows[x][y] = self
+		
 		true
-
 	end
 
-	def perform_moves!(move_sequence)
+	def perform_moves!(board, move_sequence)
 		slid = false
 		move_sequence.each do |move|
 			dy = move[0] - @pos[0]
 			dx = move[1] - @pos[1]
 			raise InvalidMoveError if slid
 			if [dy.abs, dx.abs] == [1, 1]
-				p "[dx, dy] is [#{dx}, #{dy}]"
-				perform_slide(move)
+				perform_slide(board, move)
 				slid = true
 			elsif [dy.abs, dx.abs] == [2, 2]
-				perform_jump(move)
+				perform_jump(board, move)
 				next
 			else
 				raise InvalidMoveError
@@ -148,13 +153,35 @@ class Piece
 		true
 	end
 
+	def valid_move_seq?(move_sequence)
+		future_board = Marshal::load(Marshal.dump(@board))
+		begin
+			perform_moves!(future_board, move_sequence)
+		rescue
+			return false
+		end
+		return true
+	end
+
+	def perform_moves(move_sequence)
+		if valid_move_seq?(move_sequence)
+			perform_moves!(@board, move_sequence)
+			return true
+		else
+			false
+		end
+	end
+
 	def render
 		@color == :white ? "W" : "B"
 	end
+
 end
 
 class KingPiece < Piece
 
 
 end
+
+
 
