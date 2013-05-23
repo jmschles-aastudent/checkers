@@ -1,5 +1,6 @@
 class Board
-	attr_accessor :pieces
+
+	attr_accessor :pieces, :board
 
 	def initialize
 		@pieces = []
@@ -33,6 +34,27 @@ class Board
 		true
 	end
 
+	def perform_slide(from_pos, to_pos)
+
+		i, j = from_pos[0], from_pos[1]
+		x, y = to_pos[0], to_pos[1]
+
+		piece = @board[i][j]
+
+		raise InvalidMoveError unless @board[x][y].nil?
+		raise InvalidMoveError unless piece.slide_moves.include? [(x-i), (y-j)]
+
+		@board[x][y] = piece
+		@board[i][j] = nil
+
+		true
+	end
+
+	def perform_jump(from_pos, to_pos)
+		
+		
+	end
+
 	def add_piece(piece, pos)
 		@pieces << piece
 
@@ -54,6 +76,9 @@ class Board
 
 end
 
+class InvalidMoveError < StandardError
+end
+
 class Piece
 	attr_accessor :pos
 	attr_reader :color
@@ -65,16 +90,18 @@ class Piece
 		@board.add_piece(self, pos)
 	end
 
-
 	def slide_moves
 		forward_dir = (color == :white ? -1 : 1)
-		[[1, forward_dir], [-1, forward_dir]]
+		[[forward_dir, 1], [forward_dir, -1]]
 	end
 
 	def jump_moves
 		forward_dir = (color == :white ? -1 : 1)
-		@jump_moves = [[2, 2 * forward_dir], [-2, 2 * forward_dir]]
+		[[2 * forward_dir, 2], [2 * forward_dir, -2]]
 	end
+
+
+
 
 	def render
 		@color == :white ? "W" : "B"
@@ -85,3 +112,4 @@ class KingPiece < Piece
 
 
 end
+
