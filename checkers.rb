@@ -1,6 +1,7 @@
 class Board
 
 	attr_accessor :pieces, :board
+	attr_reader :rows
 
 	def initialize
 		@pieces = []
@@ -10,7 +11,7 @@ class Board
 	end
 
 	def generate_empty_board
-		@board = Array.new(8) { Array.new (8)}
+		@rows = Array.new(8) { Array.new (8)}
 	end
 
 	def place_pieces(color)
@@ -21,8 +22,6 @@ class Board
 		pieces_placed = 0
 		until pieces_placed == 12
 			8.times do |col|
-				p "col is #{col}"
-				p "current row is #{current_row}"
 				if (current_row + col) % 2 == 1
 					Piece.new(color, self, [current_row, col])
 					pieces_placed += 1
@@ -34,69 +33,17 @@ class Board
 		true
 	end
 
-	def move_valid?(from_pos, to_pos)
-		unless (from_pos + to_pos).flatten.all? { |x| x.between?(0, 7) }
-			return false
-		end
-
-		piece = @board[from_pos[0]][from_pos[1]]
-
-		return false unless @board[to_pos[0]][to_pos[1]].nil?
-		true
-	end
-
-	def perform_slide(from_pos, to_pos)
-
-		i, j, x, y = from_pos[0], from_pos[1], to_pos[0], to_pos[1]
-
-		piece = @board[i][j]
-
-		raise InvalidMoveError unless move_valid?(from_pos, to_pos)
-		raise InvalidMoveError unless piece.slide_moves.include? [(x-i), (y-j)]
-
-		@board[x][y] = piece
-		@board[i][j] = nil
-
-		true
-	end
-
-	def perform_jump(from_pos, to_pos)
-
-		# from and to square coordinates
-		i, j, x, y = from_pos[0], from_pos[1], to_pos[0], to_pos[1]
-		# jumped square coordinates
-		m, n = x - (x - i)/2, y - (y - j)/2
-		
-		jumped_piece = @board[m][n]
-
-		piece = @board[i][j]
-
-		raise InvalidMoveError unless move_valid?(from_pos, to_pos)
-		raise InvalidMoveError unless piece.jump_moves.include? [(x-i), (y-j)]
-		raise InvalidMoveError if jumped_piece.nil?
-		if jumped_piece.color == piece.color
-			raise InvalidMoveError
-		end
-
-		@pieces.delete(jumped_piece)
-		@board[m][n] = nil
-		@board[i][j] = nil
-		@board[x][y] = piece
-		true
-
-	end
-
 	def add_piece(piece, pos)
 		@pieces << piece
 
 		i = pos[0]
 		j = pos[1]
 
-		@board[i][j] = piece
+		@rows[i][j] = piece
 	end
 
 	def render_board
-		@board.each do |row|
+		@rows.each do |row|
 			row.each do |piece|
 				print (piece.nil? ? '. ' : "#{piece.render} ")
 			end
@@ -111,14 +58,16 @@ class InvalidMoveError < StandardError
 end
 
 class Piece
+	include Marshal
 	attr_accessor :pos
 	attr_reader :color
 
 	def initialize(color, board, pos)
 		@pos = pos
 		@color = color
-		@board = board
-		@board.add_piece(self, pos)
+		@board_controller = board
+		@board = board.rows
+		board.add_piece(self, pos)
 	end
 
 	def slide_moves
@@ -131,8 +80,73 @@ class Piece
 		[[2 * forward_dir, 2], [2 * forward_dir, -2]]
 	end
 
+	def move_valid?(to_pos)
+		unless (self.pos + to_pos).flatten.all? { |x| x.between?(0, 7) }
+			return false
+		end
 
+		return false unless @board[to_pos[0]][to_pos[1]].nil?
+		true
+	end
 
+	def perform_slide(to_pos)
+
+		i, j, x, y = self.pos[0], self.pos[1], to_pos[0], to_pos[1]
+
+		raise InvalidMoveError unless move_valid?(to_pos)
+		raise InvalidMoveError unless self.slide_moves.include? [(x-i), (y-j)]
+
+		@pos = [x, y]
+		@board[x][y] = self
+		@board[i][j] = nil
+
+		true
+	end
+
+	def perform_jump(to_pos)
+
+		# from and to square coordinates
+		i, j, x, y = self.pos[0], self.pos[1], to_pos[0], to_pos[1]
+		# jumped square coordinates
+		m, n = x - (x - i)/2, y - (y - j)/2
+		
+		jumped_piece = @board[m][n]
+
+		raise InvalidMoveError unless move_valid?(to_pos)
+		raise InvalidMoveError unless self.jump_moves.include? [(x-i), (y-j)]
+		raise InvalidMoveError if jumped_piece.nil?
+		if jumped_piece.color == @color
+			raise InvalidMoveError
+		end
+
+		@board_controller.pieces.delete(jumped_piece)
+		@board[m][n] = nil
+		@board[i][j] = nil
+		@pos = [x, y]
+		@board[x][y] = self
+		true
+
+	end
+
+	def perform_moves!(move_sequence)
+		slid = false
+		move_sequence.each do |move|
+			dy = move[0] - @pos[0]
+			dx = move[1] - @pos[1]
+			raise InvalidMoveError if slid
+			if [dy.abs, dx.abs] == [1, 1]
+				p "[dx, dy] is [#{dx}, #{dy}]"
+				perform_slide(move)
+				slid = true
+			elsif [dy.abs, dx.abs] == [2, 2]
+				perform_jump(move)
+				next
+			else
+				raise InvalidMoveError
+			end
+		end
+		true
+	end
 
 	def render
 		@color == :white ? "W" : "B"
